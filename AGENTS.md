@@ -3,7 +3,7 @@
 Day 13 of 40 for 40, built live on Twitch on Wednesday 18 November 2026. The problem is "Scattered AI chats everywhere", from Ritika. Work is tracked on the Superthread `day13` board and the "Day 13" page.
 
 - **Form factor:** Voice.
-- **Name:** the app doesn't have one yet, so the repo is `day13` until it does. Once it's named, anything web-facing is served at `build40for40.com/<app>/`.
+- **Brain name:** Dumpling.
 
 Shared 40 for 40 context lives in `../AGENTS.md`.
 
@@ -12,7 +12,7 @@ Shared 40 for 40 context lives in `../AGENTS.md`.
 A pnpm workspace. Install with `pnpm install` from the root, and add dependencies with `pnpm --filter <package> add <dep>`.
 
 - **`workers/brain`:** the assistant's memory. A Worker at `build40for40.com/day13/api` in front of one `UserBrain` Durable Object per signed-in person, which streams replies and files everything they dump into notes under topics. `workers/brain/README.md` is the spec. It's the Sous brain with the template's memory improvements; the `agent-memory` skill in `../.claude/skills/` explains where each piece came from.
-- **`apps/`:** empty until the voice client is picked. Whatever it is signs in with the shared WorkOS app and talks to the brain.
+- **`apps/elevenlabs`:** the prototype voice adapter for Dumpling. See `apps/elevenlabs/README.md` for setup and verification.
 
 ## Conventions
 
