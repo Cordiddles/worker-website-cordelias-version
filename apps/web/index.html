@@ -85,6 +85,8 @@ h2 small { font: 400 14px var(--font); color: var(--mute) }
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(90px + env(safe-area-inset-bottom, 0px)); max-width: 488px; margin: 0 auto; background: var(--foam); color: var(--water); border-radius: 14px; padding: 12px 14px; font-size: 14px; font-weight: 500; z-index: 5 }
 .toast[hidden] { display: none }
 .fine { color: var(--mute); font-size: 11px; margin: 26px 0 0 }
+.voice-auth { display: flex; justify-content: flex-end; padding-block: 6px }
+.voice-auth button { background: transparent; border: 1px solid var(--line); border-radius: 999px; color: var(--foam); padding: 5px 10px; font: 500 13px var(--font); cursor: pointer }
 #voice-controls { text-align: center; padding: 0 14px 10px; font: 500 13px var(--font) }
 #voice-controls p { margin: 4px 0 }
 #voice-controls a, #voice-controls button { color: var(--water); background: var(--foam); border: 0; border-radius: 999px; padding: 6px 12px; font: inherit; cursor: pointer }
@@ -95,6 +97,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
 <body>
 <div class="phone">
   <div id="pool" role="img" aria-label="Everything the brain remembers, as colour-coded dumplings"><canvas id="c"></canvas></div>
+  <div class="voice-auth pad"><button type="button" id="voice-sign-in">Sign in with WorkOS</button></div>
   <div class="seg pad" id="seg"></div>
   <div class="scroll pad" id="scroll">
     <div id="plan">
@@ -110,7 +113,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   </div>
   <div id="voice-controls" hidden>
     <p id="voice-status" role="status" aria-live="polite"></p>
-    <a id="voice-login" target="_blank" rel="noopener noreferrer" hidden>Sign in with WorkOS</a>
+    <a id="voice-login" target="_blank" rel="noopener noreferrer" hidden>Open WorkOS sign-in</a>
     <button type="button" id="voice-mute" hidden>Mute microphone</button>
     <a id="voice-preview" href="https://elevenlabs.io/app/agents/agents/agent_3401m7q8xy4xevs910n2j7t3w5yf/preview" target="_blank" rel="noopener noreferrer" hidden>Open ElevenLabs Preview</a>
   </div>

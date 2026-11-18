@@ -4,6 +4,7 @@ const mic = document.querySelector<HTMLButtonElement>('#mic')!
 const controls = document.querySelector<HTMLDivElement>('#voice-controls')!
 const status = document.querySelector<HTMLParagraphElement>('#voice-status')!
 const login = document.querySelector<HTMLAnchorElement>('#voice-login')!
+const signInButton = document.querySelector<HTMLButtonElement>('#voice-sign-in')!
 const mute = document.querySelector<HTMLButtonElement>('#voice-mute')!
 const preview = document.querySelector<HTMLAnchorElement>('#voice-preview')!
 const api = '/dumpling/api'
@@ -54,6 +55,7 @@ async function signIn() {
       })
       if (result.response.ok && typeof result.data.access_token === 'string') {
         accessToken = result.data.access_token
+        signInButton.hidden = true
         show('Signed in. Tap the mic to start.')
         return
       }
@@ -95,6 +97,7 @@ async function toggleVoice() {
     const { response, data } = await post('/voice/session', { headers: { Authorization: 'Bearer ' + accessToken } })
     if (response.status === 401) {
       accessToken = ''
+      signInButton.hidden = false
       await signIn()
       return
     }
@@ -126,6 +129,9 @@ async function toggleVoice() {
   }
 }
 
+signInButton.addEventListener('click', () => {
+  if (!accessToken) void toggleVoice()
+})
 mic.addEventListener('dumpling:voice-toggle', () => void toggleVoice())
 mute.addEventListener('click', () => {
   if (!active) return

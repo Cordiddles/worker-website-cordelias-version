@@ -13,8 +13,19 @@ async function workos(path, data) {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ client_id: CLIENT_ID, ...data }).toString(),
     signal: AbortSignal.timeout(10_000),
-    redirect: 'error',
+    redirect: 'manual',
   })
+}
+
+async function verifyOwner(env, authorization) {
+  if (!authorization?.match(/^Bearer \S+$/)) return json({ error: 'sign_in_required' }, 401)
+  const profile = await env.BRAIN.fetch('https://build40for40.com/day13/api/me', { headers: { authorization } })
+  if (profile.status === 401) return json({ error: 'sign_in_required' }, 401)
+  if (!profile.ok) return json({ error: 'brain_unavailable' }, 502)
+  const { id } = await profile.json()
+  if (!env.DUMPLING_VOICE_OWNER_ID || id !== env.DUMPLING_VOICE_OWNER_ID) {
+    return json({ error: 'voice_account_not_allowed' }, 403)
+  }
 }
 
 export default {
@@ -46,25 +57,22 @@ export default {
             ? data.error : 'sign_in_unavailable'
           return json({ error }, upstream.status)
         }
-        return json({ access_token: data.access_token })
+        if (typeof data.access_token !== 'string') return json({ error: 'sign_in_unavailable' }, 502)
+        const denied = await verifyOwner(env, 'Bearer ' + data.access_token)
+        return denied ?? json({ access_token: data.access_token })
       }
 
       if (path !== BASE + '/voice/session') return json({ error: 'not_found' }, 404)
       if (!env.DUMPLING_VOICE_OWNER_ID || !env.ELEVENLABS_API_KEY) return json({ error: 'voice_not_configured' }, 503)
-      const authorization = request.headers.get('Authorization')
-      if (!authorization?.match(/^Bearer \S+$/)) return json({ error: 'sign_in_required' }, 401)
-      const profile = await env.BRAIN.fetch('https://build40for40.com/day13/api/me', { headers: { authorization } })
-      if (profile.status === 401) return json({ error: 'sign_in_required' }, 401)
-      if (!profile.ok) return json({ error: 'brain_unavailable' }, 502)
-      const { id } = await profile.json()
-      if (id !== env.DUMPLING_VOICE_OWNER_ID) return json({ error: 'voice_account_not_allowed' }, 403)
+      const denied = await verifyOwner(env, request.headers.get('Authorization'))
+      if (denied) return denied
 
       const endpoint = new URL('https://api.elevenlabs.io/v1/convai/conversation/get-signed-url')
       endpoint.searchParams.set('agent_id', AGENT_ID)
       const voice = await fetch(endpoint, {
         headers: { 'xi-api-key': env.ELEVENLABS_API_KEY },
         signal: AbortSignal.timeout(10_000),
-        redirect: 'error',
+        redirect: 'manual',
       })
       if (!voice.ok) return json({ error: 'voice_unavailable' }, 502)
       const { signed_url } = await voice.json()
