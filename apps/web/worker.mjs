@@ -10,7 +10,8 @@ function json(body, status = 200) {
 async function workos(path, data) {
   return fetch(WORKOS + path, {
     method: 'POST',
-    body: new URLSearchParams({ client_id: CLIENT_ID, ...data }),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: CLIENT_ID, ...data }).toString(),
     signal: AbortSignal.timeout(10_000),
     redirect: 'error',
   })
@@ -72,8 +73,10 @@ export default {
         return json({ error: 'voice_unavailable' }, 502)
       }
       return json({ signed_url })
-    } catch {
-      return json({ error: 'voice_unavailable' }, 502)
+    } catch (cause) {
+      const devicePath = path === BASE + '/device/start' || path === BASE + '/device/poll'
+      console.warn('Dumpling voice upstream failure', { phase: devicePath ? 'workos' : 'voice', name: cause?.name })
+      return json({ error: devicePath ? 'sign_in_unavailable' : 'voice_unavailable' }, 502)
     }
   },
 }
