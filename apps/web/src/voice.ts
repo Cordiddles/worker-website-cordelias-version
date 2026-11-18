@@ -1,14 +1,15 @@
 import { Conversation } from '@elevenlabs/client'
+import { getAccessToken, sessionChanges, setAccessToken } from './session'
 
 const mic = document.querySelector<HTMLButtonElement>('#mic')!
 const controls = document.querySelector<HTMLDivElement>('#voice-controls')!
 const status = document.querySelector<HTMLParagraphElement>('#voice-status')!
 const login = document.querySelector<HTMLAnchorElement>('#voice-login')!
+const signInButton = document.querySelector<HTMLButtonElement>('#voice-sign-in')!
 const mute = document.querySelector<HTMLButtonElement>('#voice-mute')!
 const preview = document.querySelector<HTMLAnchorElement>('#voice-preview')!
 const api = '/dumpling/api'
 
-let accessToken = ''
 let active: Awaited<ReturnType<typeof Conversation.startSession>> | undefined
 let busy = false
 let muted = false
@@ -53,7 +54,7 @@ async function signIn() {
         body: JSON.stringify({ device_code: data.device_code }),
       })
       if (result.response.ok && typeof result.data.access_token === 'string') {
-        accessToken = result.data.access_token
+        setAccessToken(result.data.access_token)
         show('Signed in. Tap the mic to start.')
         return
       }
@@ -66,6 +67,13 @@ async function signIn() {
     login.removeAttribute('href')
   }
 }
+
+function syncSignIn() {
+  signInButton.hidden = Boolean(getAccessToken())
+}
+
+sessionChanges.addEventListener('change', syncSignIn)
+syncSignIn()
 
 const messages: Record<string, string> = {
   voice_not_configured: 'Dumpling voice still needs server setup.',
@@ -85,6 +93,7 @@ async function toggleVoice() {
       show('Call ended.')
       return
     }
+    const accessToken = getAccessToken()
     if (!accessToken) {
       show('Preparing WorkOS sign-in…')
       await signIn()
@@ -94,7 +103,7 @@ async function toggleVoice() {
     show('Connecting to Dumpling…')
     const { response, data } = await post('/voice/session', { headers: { Authorization: 'Bearer ' + accessToken } })
     if (response.status === 401) {
-      accessToken = ''
+      setAccessToken('')
       await signIn()
       return
     }
@@ -129,6 +138,9 @@ async function toggleVoice() {
   }
 }
 
+signInButton.addEventListener('click', () => {
+  if (!getAccessToken()) void toggleVoice()
+})
 mic.addEventListener('dumpling:voice-toggle', () => void toggleVoice())
 mute.addEventListener('click', () => {
   if (!active) return
