@@ -9,6 +9,7 @@ export type Item = {
   short: string
   text: string
   due: number
+  dueDate?: string
   urgent: boolean
   who?: string
   area: 'work' | 'personal'
@@ -62,6 +63,7 @@ export function toItem(note: Note, todayIso: string): (Item & { days: number | n
     short: shorten(note.title),
     text: note.title,
     due: 0,
+    dueDate: date ?? undefined,
     days: date ? daysUntil(todayIso, date) : null,
     event: note.kind === 'event',
     urgent: f.importance === 'high',

@@ -92,6 +92,14 @@ h2 small { font: 400 14px var(--font); color: var(--mute) }
 #voice-controls a, #voice-controls button { color: var(--water); background: var(--foam); border: 0; border-radius: 999px; padding: 6px 12px; font: inherit; cursor: pointer }
 #voice-controls [hidden] { display: none }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px }
+.move-task, #task-move button { color: inherit; background: transparent; border: 1px solid currentColor; border-radius: 8px; padding: 4px 8px; cursor: pointer; font: inherit }
+.move-task { font-size: 11px; margin-inline: 6px }
+#task-move { max-width: min(320px, 85vw); background: #0b2c36; color: #d9f3ee; border: 1px solid #587376; border-radius: 12px; padding: 18px }
+#task-move::backdrop { background: #07161dbb }
+#task-move p { margin: 0 0 12px }
+#task-move input { display: block; font: inherit; margin: 6px 0 12px }
+#task-move button { margin-right: 6px }
+#task-move-error { margin-top: 12px }
 </style>
 </head>
 <body>
@@ -106,7 +114,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
       <button class="donebtn" id="donelabel"></button><div id="donelist"></div>
     </div>
     <div id="future" hidden></div>
-    <p class="fine">Example data, made up for the Day 13 mind dump.</p>
+    <p class="fine" id="example-label">Example data, made up for the Day 13 mind dump.</p>
   </div>
   <div class="bar pad">
     <form id="f"><input id="in" autocomplete="off" placeholder="Type or tap the mic to talk" aria-label="Dump anything"><button type="button" class="mic" id="mic" aria-label="Talk to Dumpling"><svg class="mk" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><svg class="arrow" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></form>
@@ -120,6 +128,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outl
   <div class="toast" id="toast" hidden></div>
 </div>
 
+<dialog id="task-move" aria-labelledby="task-move-title">
+  <p id="task-move-title"></p>
+  <form id="task-move-form">
+    <label for="task-move-date">New due date</label>
+    <input type="date" id="task-move-date" required>
+    <button type="submit" id="task-move-save">Save date</button>
+    <button type="button" id="task-move-cancel">Cancel</button>
+    <div id="task-move-error" role="alert"></div>
+  </form>
+</dialog>
 <script>
 const reefs = [
   { name: 'Meals', color: '#7be0b0', x: .13, kw: /pasta|dinner|meal|menu|recipe|rice|cook|lunch|snack|soup|cake|groceries/i },
@@ -132,7 +150,7 @@ const reefs = [
 const reef = (n) => reefs.find((r) => r.name === n)
 let base = new Date(2026, 10, 18) // Wednesday, today in the example. When connected to the brain, it's the real today.
 let uid = 1; const now = Date.now()
-let items = [
+const exampleItems = [
   { reef: 'Work', short: 'Safety summary', text: 'Send the safety summary to Dad', due: 0 },
   { reef: 'Work', short: 'Supplier reply', text: 'Reply to the equipment supplier', due: 0 },
   { reef: 'Work', short: 'Call dentist', text: 'Call the dentist for Sam’s check-up', due: 0 },
@@ -151,7 +169,8 @@ let items = [
   { reef: 'Bali trip', short: 'Cooking class', text: 'Confirm six places at the Ubud cooking class', due: 128 },
   { reef: 'School', short: 'School email', text: 'Reply to the school email', due: 0, done: true, doneAt: now - 5 * 36e5 },
   { reef: 'Work', short: 'Invoice', text: 'Approve the supplier invoice', due: 0, done: true, doneAt: now - 4 * 36e5 },
-].map((i) => ({ id: uid++, done: false, ...i }))
+]
+let items = exampleItems.map((i) => ({ id: uid++, done: false, ...i }))
 
 // ---------- grouping ----------
 const eff = (i) => i.due - (i.lead || 0)
@@ -197,11 +216,55 @@ function tick(i) { // a small outlined dumpling in the task's own shape: tap it 
   b.addEventListener('click', () => { b.classList.add('eating'); const r = b.closest('.card, .sub-row'); if (r) r.classList.add('eaten'); setTimeout(() => complete(i), reduce ? 0 : 950) })
   return b
 }
-function row(i) { const c = h('div', 'card' + (fresh.has(i.id) ? ' fresh' : '')); c.dataset.id = i.id; c.style.setProperty('--c', reef(i.reef).color); const t = h('div', 'txt', h('div', 'short', i.short)); if (i.why) t.append(h('div', 'why', i.why)); c.append(t, tick(i)); return c }
+let taskToMove
+const moveDialog = $('task-move')
+const moveDate = $('task-move-date')
+const moveSave = $('task-move-save')
+const moveError = $('task-move-error')
+function moveButton(i) {
+  if (!i.path?.startsWith('tasks/')) return null
+  const button = h('button', 'move-task', 'Move')
+  button.type = 'button'
+  button.title = i.text
+  button.setAttribute('aria-label', 'Move ' + i.text)
+  button.addEventListener('click', () => {
+    taskToMove = i
+    $('task-move-title').textContent = i.text
+    moveDate.value = i.dueDate ?? ''
+    moveError.textContent = ''
+    moveDialog.showModal()
+  })
+  return button
+}
+$('task-move-cancel').addEventListener('click', () => moveDialog.close())
+moveDialog.addEventListener('cancel', (event) => {
+  if (moveSave.disabled) event.preventDefault()
+})
+$('task-move-form').addEventListener('submit', async (event) => {
+  event.preventDefault()
+  const brain = window.DumplingBrain
+  if (!brain || !taskToMove || moveSave.disabled) return
+  moveSave.disabled = true
+  moveDate.disabled = true
+  $('task-move-cancel').disabled = true
+  moveError.textContent = ''
+  try {
+    await brain.setDue(taskToMove.path, moveDate.value)
+    moveDialog.close()
+    toast('Task moved.')
+  } catch {
+    moveError.textContent = 'Couldn’t move this task. Check your sign-in and try again.'
+  } finally {
+    moveSave.disabled = false
+    moveDate.disabled = false
+    $('task-move-cancel').disabled = false
+  }
+})
+function row(i) { const c = h('div', 'card' + (fresh.has(i.id) ? ' fresh' : '')); c.dataset.id = i.id; c.style.setProperty('--c', reef(i.reef).color); const t = h('div', 'txt', h('div', 'short', i.short)); if (i.why) t.append(h('div', 'why', i.why)); c.append(t, ...[moveButton(i), tick(i)].filter(Boolean)); return c }
 function groupCard(e) {
   const same = e.items.every((x) => x.reef === e.items[0].reef), c = h('div', 'card group'); c.style.setProperty('--c', same ? reef(e.items[0].reef).color : '#d9f3ee')
   c.append(h('div', 'gh', e.theme))
-  for (const i of e.items) { const r = h('div', 'sub-row'); r.dataset.id = i.id; r.style.setProperty('--c', reef(i.reef).color); if (i.who) r.append(h('span', 'who', i.who)); r.append(h('div', 'txt', h('div', 'short', i.short)), tick(i)); c.append(r) }
+  for (const i of e.items) { const r = h('div', 'sub-row'); r.dataset.id = i.id; r.style.setProperty('--c', reef(i.reef).color); if (i.who) r.append(h('span', 'who', i.who)); r.append(h('div', 'txt', h('div', 'short', i.short)), ...[moveButton(i), tick(i)].filter(Boolean)); c.append(r) }
   return c
 }
 function fill(el, list, emptyText) { el.replaceChildren(); const es = entries(list); es.forEach((e) => el.append(e.items.length > 1 ? groupCard(e) : row(e.items[0]))); if (!es.length) el.append(h('p', 'empty', emptyText)) }
@@ -218,7 +281,7 @@ function render() {
   if (showDone) for (const i of D) { const r = h('div', 'done-row', h('span', null, i.short)); const b = h('button', 'link', 'Put back'); b.addEventListener('click', () => { i.done = false; sync(); if (window.DumplingBrain?.connected && i.path) window.DumplingBrain.setStatus(i.path, 'open').catch(() => { i.done = true; sync() }) }); r.append(b); dv.append(r) }
   const fv = $('future'); fv.replaceChildren()
   const groups = [['This week', (i) => eff(i) <= 7], ['This month', (i) => eff(i) > 7 && eff(i) <= 31], ['Later', (i) => eff(i) > 31]]
-  for (const [name, test] of groups) { const L = future().filter(test); if (!L.length) continue; fv.append(h('div', 'label', name)); for (const i of L) { const r = h('div', 'up'); r.dataset.id = i.id; r.style.setProperty('--c', reef(i.reef).color); r.append(h('i'), h('span', 'n', i.short), h('span', 'd', fmtDate(i.due))); fv.append(r) } }
+  for (const [name, test] of groups) { const L = future().filter(test); if (!L.length) continue; fv.append(h('div', 'label', name)); for (const i of L) { const r = h('div', 'up'); r.dataset.id = i.id; r.style.setProperty('--c', reef(i.reef).color); r.append(h('i'), h('span', 'n', i.short), h('span', 'd', i.path && i.undated ? 'No date' : fmtDate(i.due))); const move = moveButton(i); if (move) r.append(move); fv.append(r) } }
   if (!future().length) fv.append(h('p', 'empty', 'Nothing coming up.'))
 }
 
@@ -314,10 +377,19 @@ $('mic').addEventListener('click', () => {
 $('mic').addEventListener('dumpling:voice-state', syncMic)
 syncMic()
 render()
-// Hooks for src/connect.ts, which loads real tasks from the brain when the page is opened with #connect.
+// Hooks for the signed-in Brain list.
 window.dumpling = {
   toast,
+  resetItems() {
+    if (!$('example-label').hidden) return
+    base = new Date(2026, 10, 18)
+    items = exampleItems.map((i) => ({ id: uid++, done: false, ...i }))
+    $('example-label').hidden = false
+    bubbles = []; items.filter((i) => !i.done).forEach((i) => spawn(i, false))
+    render()
+  },
   setItems(list, todayIso) {
+    $('example-label').hidden = true
     base = new Date(+todayIso.slice(0, 4), +todayIso.slice(5, 7) - 1, +todayIso.slice(8, 10))
     items = list.map((i) => ({ id: uid++, ...i }))
     bubbles = []; items.filter((i) => !i.done).forEach((i) => spawn(i, false))
